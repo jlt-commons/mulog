@@ -10,5 +10,5 @@ match the JVM class, so flakes printed here read there and sort the same.
 
 ```clojure
 {:deps {com.brunobonacci/mulog
-        {:git/url "https://github.com/jolt-lang/mulog" :git/sha "..."}}}
+        {:git/url "https://github.com/jlt-commons/mulog" :git/sha "..."}}}
 ```

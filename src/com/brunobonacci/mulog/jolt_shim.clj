@@ -6,7 +6,7 @@
   compareTo all match the JVM class, so flakes printed here read there and
   sort the same. ClojureThreadLocal rides on jolt.host/thread-id.
   ScheduledThreadPoolExecutor covers the surface mulog's timer pool reaches
-  (scheduleAtFixedRate and the cancel/shutdown paths) over a future loop."
+  (scheduleAtFixedRate and the cancel/shutdown paths) over a daemon thread loop."
   (:require [clojure.string :as str]))
 
 ;; --- Flake -------------------------------------------------------------------
@@ -141,7 +141,7 @@
 
 ;; --- ScheduledThreadPoolExecutor --------------------------------------------
 ;; the surface mulog's timer pool reaches: scheduleAtFixedRate, and cancel /
-;; shutdown. Each schedule runs a future loop with a stop flag.
+;; shutdown. Each schedule runs a loop on a daemon thread with a stop flag.
 (def ^:private stpe-tag :mulog/scheduled-pool)
 (def ^:private sfut-tag :mulog/scheduled-future)
 (doseq [nm ["ScheduledThreadPoolExecutor" "java.util.concurrent.ScheduledThreadPoolExecutor"]]
@@ -158,13 +158,18 @@
      (let [stop (atom false)
            down (jolt.host/ref-get self :down)
            dm (ms-of delay unit) pm (ms-of period unit)
-           fut (future
-                 (Thread/sleep dm)
-                 (loop []
-                   (when-not (or @stop @down)
-                     (try (task) (catch Exception _ nil))
-                     (Thread/sleep pm)
-                     (recur))))
+           ;; a daemon thread, as the JVM pool's thread factory makes them:
+           ;; a scheduled task must not keep the process alive
+           fut (doto (Thread.
+                       (fn []
+                         (Thread/sleep dm)
+                         (loop []
+                           (when-not (or @stop @down)
+                             (try (task) (catch Exception _ nil))
+                             (Thread/sleep pm)
+                             (recur)))))
+                 (.setDaemon true)
+                 (.start))
            sf (doto (jolt.host/tagged-table sfut-tag)
                 (jolt.host/ref-put! :stop stop)
                 (jolt.host/ref-put! :fut fut))]

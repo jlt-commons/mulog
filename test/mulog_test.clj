@@ -25,6 +25,13 @@
             (compare (Flake/makeFlake -1 0 0) (Flake/makeFlake 1 0 0))]))
   (check "flakes are time-ordered" true
          (let [a (flakes/flake) b (flakes/flake)] (neg? (compare a b))))
+  ;; the JVM pool's thread factory makes daemon threads, so a pending timer
+  ;; never keeps the process alive after -main returns
+  (check "timer tasks run on daemon threads" true
+         (let [p (promise)
+               cancel (com.brunobonacci.mulog.buffer/recurring-task
+                        10 (fn [] (deliver p (.isDaemon (Thread/currentThread)))))]
+           (try (deref p 2000 :timeout) (finally (cancel)))))
   (let [captured (atom [])
         buf (com.brunobonacci.mulog.buffer/agent-buffer 100)
         stop (u/start-publisher! {:type :inline :publisher
@@ -42,6 +49,8 @@
       (check "event published with merged context" ["gate" 7 1]
              [(:app e) (:req e) (:x e)])
       (check "trace-id is a flake" true (some? (:mulog/trace-id e)))))
+  ;; the buffers are agents; as on the JVM, their pool outlives -main
+  (shutdown-agents)
   (if (pos? @failures)
     (throw (ex-info "failures" {:n @failures}))
     (println "all mulog checks passed")))

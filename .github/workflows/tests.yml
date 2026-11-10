@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install jolt runtime deps
         if: runner.os == 'Linux'
         run: |
@@ -20,7 +20,7 @@ jobs:
           sudo apt-get install -y liblz4-1 zlib1g libtinfo6
       - id: jolt
         uses: jlt-commons/setup-jolt@v1.0.2
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.jolt/gitlibs
